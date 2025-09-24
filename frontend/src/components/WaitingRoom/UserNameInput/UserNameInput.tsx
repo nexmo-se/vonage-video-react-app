@@ -12,6 +12,7 @@ import { setStorageItem, STORAGE_KEYS } from '../../../utils/storage';
 export type UserNameInputProps = {
   username: string;
   setUsername: Dispatch<SetStateAction<string>>;
+  preappointmentButtons?: React.ReactNode;
 };
 
 declare module '@mui/material/styles' {
@@ -41,7 +42,11 @@ const theme = createTheme({
  *  @property {Dispatch<SetStateAction<string>>} setUsername - Function to update the user's username.
  * @returns {ReactElement} The UsernameInput component.
  */
-const UsernameInput = ({ username, setUsername }: UserNameInputProps): ReactElement => {
+const UsernameInput = ({
+  username,
+  setUsername,
+  preappointmentButtons,
+}: UserNameInputProps): ReactElement => {
   const { setUser } = useUserContext();
   const navigate = useNavigate();
   const roomName = useRoomName();
@@ -130,6 +135,9 @@ const UsernameInput = ({ username, setUsername }: UserNameInputProps): ReactElem
               }}
             />
           </div>
+          {preappointmentButtons && (
+            <div className="flex flex-col items-center mb-3">{preappointmentButtons}</div>
+          )}
           <Button
             onClick={handleJoinClick}
             variant="contained"

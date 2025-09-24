@@ -3,30 +3,32 @@
 ## Table of Contents
 <!-- TOC -->
 
-- [Table of Contents](#table-of-contents)
-- [What is it?](#what-is-it)
-- [Why use it?](#why-use-it)
-- [Project Architecture](#project-architecture)
-- [Platforms Supported](#platforms-supported)
-- [Requirements](#requirements)
-- [Running Locally](#running-locally)
-- [Testing on Multiple Devices](#testing-on-multiple-devices)
-- [Deployment to Vonage Cloud Runtime](#deployment-to-vonage-cloud-runtime)
-- [Testing](#testing)
-  - [Integration Tests](#integration-tests)
-    - [Screenshot tests or Visual comparisons](#screenshot-tests-or-visual-comparisons)
-    - [Generating and Updating Screenshots](#generating-and-updating-screenshots)
-  - [Running the backend and frontend test suites](#running-the-backend-and-frontend-test-suites)
-  - [Backend Suite](#backend-suite)
-  - [Frontend Suite](#frontend-suite)
-- [Code style](#code-style)
-  - [Linting and auto-formatting](#linting-and-auto-formatting)
-  - [File names](#file-names)
-- [Documentation Generation](#documentation-generation)
-- [Code of Conduct](#code-of-conduct)
-- [Getting Involved](#getting-involved)
-- [Known Issues](#known-issues)
-- [Report Issues](#report-issues)
+- [Vonage Video API Reference App for React](#vonage-video-api-reference-app-for-react)
+  - [Table of Contents](#table-of-contents)
+  - [What is it?](#what-is-it)
+  - [Why use it?](#why-use-it)
+  - [Project Architecture](#project-architecture)
+  - [Platforms Supported](#platforms-supported)
+  - [Requirements](#requirements)
+  - [Running Locally](#running-locally)
+      - [Preappointment API Environment Variable](#preappointment-api-environment-variable)
+  - [Testing on Multiple Devices](#testing-on-multiple-devices)
+  - [Deployment to Vonage Cloud Runtime](#deployment-to-vonage-cloud-runtime)
+  - [Testing](#testing)
+    - [Integration Tests](#integration-tests)
+      - [Screenshot tests or Visual comparisons](#screenshot-tests-or-visual-comparisons)
+      - [Generating and Updating Screenshots](#generating-and-updating-screenshots)
+    - [Running the backend and frontend test suites](#running-the-backend-and-frontend-test-suites)
+    - [Backend Suite](#backend-suite)
+    - [Frontend Suite](#frontend-suite)
+  - [Code style](#code-style)
+    - [Linting and auto-formatting](#linting-and-auto-formatting)
+    - [File names](#file-names)
+  - [Documentation Generation](#documentation-generation)
+  - [Code of Conduct](#code-of-conduct)
+  - [Getting Involved](#getting-involved)
+  - [Known Issues](#known-issues)
+  - [Report Issues](#report-issues)
 
 <!-- /TOC -->
 ## What is it?
@@ -152,10 +154,28 @@ The Vonage Video API Reference App for React is currently supported on the lates
   cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env
   ```
 
+
   Then, open **backend/.env** and fill in the required configuration:
 
   - **VONAGE_APP_ID** – This is the ID of your Vonage application. You can find it on the [Applications page](https://dashboard.vonage.com/applications).
   - **VONAGE_PRIVATE_KEY** – If you've already generated a private key, use that. Otherwise, use the key you downloaded when creating the app.
+
+  </br>
+
+  #### Preappointment API Environment Variable
+
+  The frontend supports a preappointment check-in feature that can use either local mock routes (for development) or a remote backend (for production/testing).
+
+  - **VITE_PREAPPOINTMENT_API_URL** – (Optional) Set this variable in `frontend/.env` to specify the base URL for the preappointment API endpoints (`/vregister`, `/vstart`, `/vstop`).
+    - If set, all preappointment API calls will use this as the base URL (e.g., `https://your-server.com`).
+    - If not set or commented out, the frontend will use local mock routes (e.g., `/vregister`) for development/testing with the local Express backend.
+    - Example:
+      ```ini
+      # Use remote backend for preappointment API
+      VITE_PREAPPOINTMENT_API_URL=https://your-server.com
+      # For local development, comment out the above line to use mock routes
+      # VITE_PREAPPOINTMENT_API_URL=https://your-server.com
+      ```
 
 </br>
 

@@ -33,6 +33,12 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       allowedHosts: ['*', env.VITE_TUNNEL_DOMAIN],
+      proxy: {
+        // Proxy API requests to the backend server
+        '/vregister': 'http://localhost:3345',
+        '/vstart': 'http://localhost:3345',
+        '/vstop': 'http://localhost:3345',
+      },
     },
     optimizeDeps: {
       include: ['@emotion/react', '@emotion/styled', '@mui/material/Tooltip'],

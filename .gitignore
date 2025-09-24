@@ -51,3 +51,7 @@ build
 /scripts/allLicenseResults.json
 
 vcr.yml
+
+private.key
+
+DEV
