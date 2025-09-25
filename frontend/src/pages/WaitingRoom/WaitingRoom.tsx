@@ -127,7 +127,6 @@ const WaitingRoom = (): ReactElement => {
         }
         const sessionId = preapptSession.current.sessionId;
         const streamId = preapptStreamId;
-        // TODO: Replace these with real values from your UI/state as needed
         const language = 'en-US';
         const promptId = 21; // Pizza Ordering
         const filter = false;
@@ -136,14 +135,33 @@ const WaitingRoom = (): ReactElement => {
           console.warn('No streamId available. Wait for streamCreated event.');
           return;
         }
+        console.log('Sending vstart payload:', {
+          sessionId,
+          streamId,
+          language,
+          promptId,
+          filter,
+          voice,
+        });
         const response = await fetch(getPreapptApiUrl('/vstart'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId, streamId, language, promptId, filter, voice }),
         });
-        const data = await response.json();
-        console.log('Preappointment Start response:', data);
-        setPreapptStarted(true);
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (jsonErr) {
+          console.error('vstart: Failed to parse JSON. Raw response:', text);
+          data = text;
+        }
+        if (!response.ok) {
+          console.error('vstart: Server returned error', response.status, data);
+        } else {
+          console.log('Preappointment Start response:', data);
+          setPreapptStarted(true);
+        }
       } else {
         // Stop
         const sessionId = preapptSession.current.sessionId;
@@ -152,9 +170,24 @@ const WaitingRoom = (): ReactElement => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId }),
         });
-        const data = await response.json();
-        console.log('Preappointment Stop response:', data);
-        setPreapptStarted(false);
+        const text = await response.text();
+        let data;
+        if (text.trim() === '') {
+          data = null;
+        } else {
+          try {
+            data = JSON.parse(text);
+          } catch (_jsonErr) {
+            console.error('vstop: Failed to parse JSON. Raw response:', text);
+            data = text;
+          }
+        }
+        if (!response.ok) {
+          console.error('vstop: Server returned error', response.status, data);
+        } else {
+          console.log('Preappointment Stop response:', data);
+          setPreapptStarted(false);
+        }
       }
     } catch (err) {
       console.error('Preappointment Toggle error:', err);

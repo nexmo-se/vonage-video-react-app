@@ -27,22 +27,30 @@ router.post('/vregister', (req: Request, res: Response) => {
   });
 });
 
-// POST /vstart: expects publisherId, returns mock audioConnectorId
+// POST /vstart: expects sessionId, streamId, language, promptId, filter, voice
 router.post('/vstart', (req: Request, res: Response) => {
-  const { publisherId } = req.body;
+  const { sessionId, streamId, language, promptId, filter, voice } = req.body;
+  // Log the received payload for debugging
+  console.log('[MOCK] /vstart received:', {
+    sessionId,
+    streamId,
+    language,
+    promptId,
+    filter,
+    voice,
+  });
   res.json({
-    message: 'vstart success',
-    publisherId,
-    audioConnectorId: 'mock-audio-connector-' + Math.random().toString(36).substring(2, 10),
+    uuid: 'mock-uuid-' + Math.random().toString(36).substring(2, 10),
+    id: 'mock-id-' + Math.random().toString(36).substring(2, 10),
+    connectionId: 'mock-connection-' + Math.random().toString(36).substring(2, 10),
   });
 });
 
-// POST /vstop: returns stopped confirmation
+// POST /vstop: expects sessionId, returns empty response (204)
 router.post('/vstop', (req: Request, res: Response) => {
-  res.json({
-    message: 'vstop success',
-    stopped: true,
-  });
+  const { sessionId } = req.body;
+  console.log('[MOCK] /vstop received:', { sessionId });
+  res.status(204).send();
 });
 
 export default router;

@@ -178,6 +178,7 @@ The Vonage Video API Reference App for React is currently supported on the lates
       # VITE_PREAPPOINTMENT_API_URL=https://your-server.com
       ```
 
+
   **API Contract:**
   - `/vregister` expects a POST with no body and returns:
     ```json
@@ -189,8 +190,37 @@ The Vonage Video API Reference App for React is currently supported on the lates
       }
     }
     ```
-  - The frontend expects and uses `token` (not `jwt`) for session operations.
-  - `/vstart` uses the `token` as part of the publisherId or as needed.
+    The frontend expects and uses `token` (not `jwt`) for session operations.
+
+  - `/vstart` expects a POST with the following payload:
+    ```json
+    {
+      "sessionId": "...",
+      "streamId": "...",
+      "language": "en-US",
+      "promptId": 21,
+      "filter": false,
+      "voice": "us"
+    }
+    ```
+    and returns:
+    ```json
+    {
+      "uuid": "...",
+      "id": "...",
+      "connectionId": "..."
+    }
+    ```
+
+  - `/vstop` expects a POST with:
+    ```json
+    {
+      "sessionId": "..."
+    }
+    ```
+    and returns an empty response (204 No Content).
+
+  The local mock server now matches this contract for development/testing.
 
 </br>
 
