@@ -1,19 +1,21 @@
 ## Pizza Ordering Preappointment Use Case
 
-This app demonstrates a preappointment check-in and AI agent interaction flow, using the Vonage Video API to connect users to an AI-powered pizza ordering agent.
+This app demonstrates a preappointment check-in and AI agent interaction flow, using the Vonage Video API to connect users to an AI-powered health intake agent.
 
 **How it works:**
 
-1. **Check-in:** The user clicks "Preappointment Check-in" to register and join a video session.
-2. **Start (vstart):** The user clicks "Preappointment Start" to begin the pizza ordering scenario. The frontend sends a payload to `/vstart` with:
-  - `sessionId`: The current session
-  - `streamId`: The user's publisher stream
-  - `language`: Always `en-US`
-  - `promptId`: Always `21` (Pizza Ordering)
-  - `filter`: Always `false`
-  - `voice`: Always `us`
-3. **Subscribing to the AI Agent:** After `/vstart`, the backend connects an AI audio connector agent (the pizza ordering bot) to the session. The frontend automatically subscribes to any new remote streams (including the AI agent) and plays the audio in the UI. This allows the user to interact with the AI agent as if it were another participant.
-4. **Stop (vstop):** The user can click "Preappointment Stop" to end the interaction, which disconnects the AI agent and stops the scenario.
+
+1. **Start (Combined):** The user clicks a single "Preappointment Start" button. This automatically registers the user, joins a video session, and immediately starts the health intake scenario. The frontend sends both `/vregister` and `/vstart` requests in sequence:
+   - `/vregister` registers the user and returns session credentials.
+   - `/vstart` is sent with:
+     - `sessionId`: The current session
+     - `streamId`: The user's publisher stream
+     - `language`: Always `en-US`
+     - `promptId`: Always `24` (Health Intake)
+     - `filter`: Always `false`
+     - `voice`: Always `us`
+2. **Subscribing to the AI Agent:** After `/vstart`, the backend connects an AI audio connector agent (the health intake bot) to the session. The frontend automatically subscribes to any new remote streams (including the AI agent) and plays the audio in the UI. This allows the user to interact with the AI agent as if it were another participant.
+3. **Stop (vstop):** The user can click "Preappointment Stop" to end the interaction, which disconnects the AI agent and stops the scenario.
 
 **Note:**
 - The mock server simulates the AI agent by allowing multiple browser tabs to join the same session, or you can test with the real backend for a true AI experience.

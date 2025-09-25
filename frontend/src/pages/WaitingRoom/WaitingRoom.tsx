@@ -33,19 +33,20 @@ const WaitingRoom = (): ReactElement => {
   const [openVideoInput, setOpenVideoInput] = useState<boolean>(false);
   const [openAudioOutput, setOpenAudioOutput] = useState<boolean>(false);
   const [username, setUsername] = useState(getStorageItem(STORAGE_KEYS.USERNAME) ?? '');
-  const [preapptStarted, setPreapptStarted] = useState(false);
-  const [preapptCheckedIn, setPreapptCheckedIn] = useState(false);
-  const [preapptStreamId, setPreapptStreamId] = useState<string | null>(null);
+  const [preappointmentStarted, setPreappointmentStarted] = useState(false);
+  const [preappointmentStreamId, setPreappointmentStreamId] = useState<string | null>(null);
   const isSmallViewport = useIsSmallViewport();
 
-  const preapptSession = useRef<{ sessionId?: string; token?: string; apiKey?: string } | null>(
-    null
-  );
+  const preappointmentSession = useRef<{
+    sessionId?: string;
+    token?: string;
+    apiKey?: string;
+  } | null>(null);
 
   // Pass publisher's connectionId and sessionId to /vregister
 
   // Helper to get the full Preappointment API URL for a route, using env if set, else local
-  const getPreapptApiUrl = (route: string) => {
+  const getPreappointmentApiUrl = (route: string) => {
     const base = import.meta.env.VITE_PREAPPOINTMENT_API_URL;
     if (base && base.trim() !== '') {
       return base.replace(/\/$/, '') + route;
@@ -53,123 +54,121 @@ const WaitingRoom = (): ReactElement => {
     return route;
   };
 
-  const handlePreappointmentCheckin = async () => {
-    try {
-      const response = await fetch(getPreapptApiUrl('/vregister'), { method: 'POST' });
-      if (!response.ok) throw new Error('Check-in failed');
-      const data = await response.json();
-      // Expecting { session: { sessionId, token, apiKey } }
-      if (!data.session) throw new Error('Invalid response from /vregister');
-      preapptSession.current = {
-        sessionId: data.session.sessionId,
-        token: data.session.token,
-        token2: data.session.token2,
-        created: data.session.created,
-        id: data.session.id,
-        lang: data.session.lang,
-        streams: data.session.streams,
-        apiKey: data.session.apiKey,
-      };
-      setPreapptCheckedIn(true);
-      console.log('Preappointment Check-in response:', data);
-
-      // Connect to OpenTok session and publish local publisher
-      if (window && (window as any).OT && data.session) {
-        const OT = (window as any).OT;
-        const session = OT.initSession(data.session.apiKey, data.session.sessionId);
-        (window as any).OT.sessions = (window as any).OT.sessions || [];
-        (window as any).OT.sessions[0] = session;
-
-        // Attach streamCreated handler immediately
-        session.on('streamCreated', (event: any) => {
-          const sid = event.stream.streamId || event.stream.id;
-          console.log('streamCreated: got streamId for vstart:', sid);
-          setPreapptStreamId(sid);
-
-          // Subscribe to remote streams (not your own)
-          if (event.stream.connection.connectionId !== session.connection.connectionId) {
-            const subscriber = session.subscribe(
-              event.stream,
-              undefined, // You can specify a DOM element/container if needed
-              {
-                insertMode: 'append',
-                width: '100%',
-                height: '100%',
-              },
-              (err: any) => {
-                if (err) {
-                  console.error('Error subscribing to stream:', err);
-                } else {
-                  console.log('Subscribed to remote stream:', sid);
-                }
-              }
-            );
-            // Optionally, store/display the subscriber video element here
-          }
-        });
-
-        session.connect(data.session.token, (error: any) => {
-          if (error) {
-            console.error('OpenTok session connect error:', error);
-          } else {
-            if (publisher) {
-              session.publish(publisher, (pubErr: any) => {
-                if (pubErr) {
-                  console.error('OpenTok publish error:', pubErr);
-                } else {
-                  console.log('Publisher published to session');
-                  // Now that we're published, we can get the streamId from publisher
-                  const sid = publisher.stream?.streamId || publisher.stream?.id;
-                  console.log('Publisher streamId for vstart:', sid);
-                  setPreapptStreamId(sid);
-                  // enable the Start button now that we have streamId
-                  setPreapptStarted(false);
-                }
-              });
-            } else {
-              console.warn('No publisher available to publish');
-            }
-          }
-        });
-      }
-    } catch (err) {
-      setPreapptCheckedIn(false);
-      console.error('Preappointment Check-in error:', err);
-    }
-  };
-
+  // Combined handler: on Start, do /vregister then /vstart; on Stop, do /vstop
   const handlePreappointmentToggle = async () => {
     try {
-      if (!preapptStarted) {
-        // Start
-        if (!preapptSession.current?.token) {
-          console.warn('No preappointment token/session. Run check-in first.');
-          return;
+      if (!preappointmentStarted) {
+        // --- Start: Register, connect, publish, then start ---
+        // 1. Register
+        const regResponse = await fetch(getPreappointmentApiUrl('/vregister'), { method: 'POST' });
+        if (!regResponse.ok) {
+          throw new Error('Check-in failed');
         }
-        const sessionId = preapptSession.current.sessionId;
-        const streamId = preapptStreamId;
+        const regData = await regResponse.json();
+        if (!regData.session) {
+          throw new Error('Invalid response from /vregister');
+        }
+        preappointmentSession.current = {
+          sessionId: regData.session.sessionId,
+          token: regData.session.token,
+          token2: regData.session.token2,
+          created: regData.session.created,
+          id: regData.session.id,
+          lang: regData.session.lang,
+          streams: regData.session.streams,
+          apiKey: regData.session.apiKey,
+        };
+        console.log('Preappointment Check-in response:', regData);
+
+        // 2. Connect to OpenTok session and publish local publisher
+        let streamId: string | null = null;
+        if (window && (window as any).OT && regData.session) {
+          const OT = (window as any).OT;
+          const session = OT.initSession(regData.session.apiKey, regData.session.sessionId);
+          (window as any).OT.sessions = (window as any).OT.sessions || [];
+          (window as any).OT.sessions[0] = session;
+
+          // Attach streamCreated handler immediately
+          session.on('streamCreated', (event: any) => {
+            const sid = event.stream.streamId || event.stream.id;
+            console.log('streamCreated: got streamId for vstart:', sid);
+            setPreappointmentStreamId(sid);
+
+            // Subscribe to remote streams (not your own)
+            if (event.stream.connection.connectionId !== session.connection.connectionId) {
+              session.subscribe(
+                event.stream,
+                undefined,
+                {
+                  insertMode: 'append',
+                  width: '100%',
+                  height: '100%',
+                },
+                (err: any) => {
+                  if (err) {
+                    console.error('Error subscribing to stream:', err);
+                  } else {
+                    console.log('Subscribed to remote stream:', sid);
+                  }
+                }
+              );
+            }
+          });
+
+          // Wait for session.connect and publisher.publish to complete before continuing
+          await new Promise<void>((resolve, reject) => {
+            session.connect(regData.session.token, (error: any) => {
+              if (error) {
+                console.error('OpenTok session connect error:', error);
+                reject(error);
+              } else {
+                if (publisher) {
+                  session.publish(publisher, (pubErr: any) => {
+                    if (pubErr) {
+                      console.error('OpenTok publish error:', pubErr);
+                      reject(pubErr);
+                    } else {
+                      console.log('Publisher published to session');
+                      // Now that we're published, we can get the streamId from publisher
+                      streamId = publisher.stream?.streamId || publisher.stream?.id;
+                      setPreappointmentStreamId(streamId);
+                      resolve();
+                    }
+                  });
+                } else {
+                  console.warn('No publisher available to publish');
+                  reject(new Error('No publisher available to publish'));
+                }
+              }
+            });
+          });
+        }
+
+        // 3. Start
+        const sessionId = preappointmentSession.current.sessionId;
+        const sid = streamId || preappointmentStreamId;
         const language = 'en-US';
-        const promptId = 21; // Pizza Ordering
+        const promptId = 24; // 24 is Health Intake prompt. 21 is Pizza Ordering
         const filter = false;
         const voice = 'us';
-        if (!streamId) {
+        if (!sid) {
           console.warn('No streamId available. Wait for streamCreated event.');
           return;
         }
         console.log('Sending vstart payload:', {
           sessionId,
-          streamId,
+          streamId: sid,
           language,
           promptId,
           filter,
           voice,
         });
-        const response = await fetch(getPreapptApiUrl('/vstart'), {
+        const startResponse = await fetch(getPreappointmentApiUrl('/vstart'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, streamId, language, promptId, filter, voice }),
+          body: JSON.stringify({ sessionId, streamId: sid, language, promptId, filter, voice }),
         });
-        const text = await response.text();
+        const text = await startResponse.text();
         let data;
         try {
           data = JSON.parse(text);
@@ -177,16 +176,16 @@ const WaitingRoom = (): ReactElement => {
           console.error('vstart: Failed to parse JSON. Raw response:', text);
           data = text;
         }
-        if (!response.ok) {
-          console.error('vstart: Server returned error', response.status, data);
+        if (!startResponse.ok) {
+          console.error('vstart: Server returned error', startResponse.status, data);
         } else {
           console.log('Preappointment Start response:', data);
-          setPreapptStarted(true);
+          setPreappointmentStarted(true);
         }
       } else {
-        // Stop
-        const sessionId = preapptSession.current.sessionId;
-        const response = await fetch(getPreapptApiUrl('/vstop'), {
+        // --- Stop ---
+        const sessionId = preappointmentSession.current.sessionId;
+        const response = await fetch(getPreappointmentApiUrl('/vstop'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId }),
@@ -207,7 +206,7 @@ const WaitingRoom = (): ReactElement => {
           console.error('vstop: Server returned error', response.status, data);
         } else {
           console.log('Preappointment Stop response:', data);
-          setPreapptStarted(false);
+          setPreappointmentStarted(false);
         }
       }
     } catch (err) {
@@ -288,23 +287,13 @@ const WaitingRoom = (): ReactElement => {
               username={username}
               setUsername={setUsername}
               preappointmentButtons={
-                <>
-                  {!preapptCheckedIn && (
-                    <PreappointmentButton
-                      onClick={handlePreappointmentCheckin}
-                      label="Preappointment Check-in"
-                      color="primary"
-                    />
-                  )}
-                  {preapptCheckedIn && (
-                    <PreappointmentButton
-                      onClick={handlePreappointmentToggle}
-                      label={preapptStarted ? 'Preappointment Stop' : 'Preappointment Start'}
-                      color={preapptStarted ? 'error' : 'success'}
-                      disabled={!preapptStreamId}
-                    />
-                  )}
-                </>
+                <PreappointmentButton
+                  onClick={handlePreappointmentToggle}
+                  label={preappointmentStarted ? 'Preappointment Stop' : 'Preappointment Start'}
+                  color={preappointmentStarted ? 'error' : 'success'}
+                  // Only disable if publisher is not ready (for Start)
+                  disabled={!publisher && !preappointmentStarted}
+                />
               }
             />
           </div>
