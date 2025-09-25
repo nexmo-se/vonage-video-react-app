@@ -37,7 +37,9 @@ const WaitingRoom = (): ReactElement => {
   const [preapptCheckedIn, setPreapptCheckedIn] = useState(false);
   const isSmallViewport = useIsSmallViewport();
 
-  const preapptSession = useRef<{ sessionId?: string; jwt?: string; apiKey?: string } | null>(null);
+  const preapptSession = useRef<{ sessionId?: string; token?: string; apiKey?: string } | null>(
+    null
+  );
 
   // Pass publisher's connectionId and sessionId to /vregister
 
@@ -55,7 +57,13 @@ const WaitingRoom = (): ReactElement => {
       const response = await fetch(getPreapptApiUrl('/vregister'), { method: 'POST' });
       if (!response.ok) throw new Error('Check-in failed');
       const data = await response.json();
-      preapptSession.current = data;
+      // Expecting { session: { sessionId, token, apiKey } }
+      if (!data.session) throw new Error('Invalid response from /vregister');
+      preapptSession.current = {
+        sessionId: data.session.sessionId,
+        token: data.session.token,
+        apiKey: data.session.apiKey,
+      };
       setPreapptCheckedIn(true);
       console.log('Preappointment Check-in response:', data);
     } catch (err) {
@@ -68,11 +76,11 @@ const WaitingRoom = (): ReactElement => {
     try {
       if (!preapptStarted) {
         // Start
-        if (!preapptSession.current?.jwt) {
-          console.warn('No preappointment JWT/session. Run check-in first.');
+        if (!preapptSession.current?.token) {
+          console.warn('No preappointment token/session. Run check-in first.');
           return;
         }
-        const publisherId = 'pub-' + preapptSession.current.jwt;
+        const publisherId = 'pub-' + preapptSession.current.token;
         const response = await fetch(getPreapptApiUrl('/vstart'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

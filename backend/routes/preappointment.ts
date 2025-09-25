@@ -5,12 +5,14 @@ const router = Router();
 // POST /vregister: returns mock sessionId, jwt, and apiKey
 router.post('/vregister', (req: Request, res: Response) => {
   const sessionId = 'mock-preappt-session-' + Math.random().toString(36).substring(2, 10);
-  const jwt = 'mock-jwt-' + Math.random().toString(36).substring(2, 10);
+  const token = 'mock-token-' + Math.random().toString(36).substring(2, 10);
   res.json({
     message: 'vregister success',
-    sessionId,
-    jwt,
-    apiKey: 'mock-api-key',
+    session: {
+      sessionId,
+      token,
+      apiKey: 'mock-api-key',
+    },
   });
 });
 

@@ -11,7 +11,7 @@
   - [Platforms Supported](#platforms-supported)
   - [Requirements](#requirements)
   - [Running Locally](#running-locally)
-      - [Preappointment API Environment Variable](#preappointment-api-environment-variable)
+      - [Preappointment API Integration](#preappointment-api-integration)
   - [Testing on Multiple Devices](#testing-on-multiple-devices)
   - [Deployment to Vonage Cloud Runtime](#deployment-to-vonage-cloud-runtime)
   - [Testing](#testing)
@@ -162,7 +162,8 @@ The Vonage Video API Reference App for React is currently supported on the lates
 
   </br>
 
-  #### Preappointment API Environment Variable
+
+  #### Preappointment API Integration
 
   The frontend supports a preappointment check-in feature that can use either local mock routes (for development) or a remote backend (for production/testing).
 
@@ -176,6 +177,20 @@ The Vonage Video API Reference App for React is currently supported on the lates
       # For local development, comment out the above line to use mock routes
       # VITE_PREAPPOINTMENT_API_URL=https://your-server.com
       ```
+
+  **API Contract:**
+  - `/vregister` expects a POST with no body and returns:
+    ```json
+    {
+      "session": {
+        "sessionId": "...",
+        "token": "...",
+        "apiKey": "..."
+      }
+    }
+    ```
+  - The frontend expects and uses `token` (not `jwt`) for session operations.
+  - `/vstart` uses the `token` as part of the publisherId or as needed.
 
 </br>
 
