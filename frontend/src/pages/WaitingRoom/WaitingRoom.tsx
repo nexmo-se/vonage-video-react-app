@@ -85,6 +85,27 @@ const WaitingRoom = (): ReactElement => {
           const sid = event.stream.streamId || event.stream.id;
           console.log('streamCreated: got streamId for vstart:', sid);
           setPreapptStreamId(sid);
+
+          // Subscribe to remote streams (not your own)
+          if (event.stream.connection.connectionId !== session.connection.connectionId) {
+            const subscriber = session.subscribe(
+              event.stream,
+              undefined, // You can specify a DOM element/container if needed
+              {
+                insertMode: 'append',
+                width: '100%',
+                height: '100%',
+              },
+              (err: any) => {
+                if (err) {
+                  console.error('Error subscribing to stream:', err);
+                } else {
+                  console.log('Subscribed to remote stream:', sid);
+                }
+              }
+            );
+            // Optionally, store/display the subscriber video element here
+          }
         });
 
         session.connect(data.session.token, (error: any) => {
