@@ -6,12 +6,23 @@ const router = Router();
 router.post('/vregister', (req: Request, res: Response) => {
   const sessionId = 'mock-preappt-session-' + Math.random().toString(36).substring(2, 10);
   const token = 'mock-token-' + Math.random().toString(36).substring(2, 10);
+  const token2 = 'mock-token2-' + Math.random().toString(36).substring(2, 10);
+  const created = Date.now();
+  const id = sessionId;
+  const lang = 'en-US';
+  const streams = [];
+  const apiKey = 'mock-api-key';
   res.json({
     message: 'vregister success',
     session: {
       sessionId,
       token,
-      apiKey: 'mock-api-key',
+      token2,
+      created,
+      id,
+      lang,
+      streams,
+      apiKey,
     },
   });
 });
