@@ -1,3 +1,25 @@
+## Pizza Ordering Preappointment Use Case
+
+This app demonstrates a preappointment check-in and AI agent interaction flow, using the Vonage Video API to connect users to an AI-powered pizza ordering agent.
+
+**How it works:**
+
+1. **Check-in:** The user clicks "Preappointment Check-in" to register and join a video session.
+2. **Start (vstart):** The user clicks "Preappointment Start" to begin the pizza ordering scenario. The frontend sends a payload to `/vstart` with:
+  - `sessionId`: The current session
+  - `streamId`: The user's publisher stream
+  - `language`: Always `en-US`
+  - `promptId`: Always `21` (Pizza Ordering)
+  - `filter`: Always `false`
+  - `voice`: Always `us`
+3. **Subscribing to the AI Agent:** After `/vstart`, the backend connects an AI audio connector agent (the pizza ordering bot) to the session. The frontend automatically subscribes to any new remote streams (including the AI agent) and plays the audio in the UI. This allows the user to interact with the AI agent as if it were another participant.
+4. **Stop (vstop):** The user can click "Preappointment Stop" to end the interaction, which disconnects the AI agent and stops the scenario.
+
+**Note:**
+- The mock server simulates the AI agent by allowing multiple browser tabs to join the same session, or you can test with the real backend for a true AI experience.
+- The frontend will subscribe to any remote stream (not published by the local user) and play the audio automatically in the waiting room.
+
+This flow is a template for integrating conversational AI agents into Vonage Video sessions for preappointment or kiosk-style use cases.
 # Vonage Video API Reference App for React
 
 ## Table of Contents
