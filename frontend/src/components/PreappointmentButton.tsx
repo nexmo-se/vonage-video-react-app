@@ -1,17 +1,12 @@
-import { Button } from '@mui/material';
-import { ReactElement } from 'react';
+import React from 'react';
+import { Button, CircularProgress } from '@mui/material';
 
 export type PreappointmentButtonProps = {
   onClick: (event: React.MouseEvent) => void;
   label: string;
   color?: 'primary' | 'success' | 'error';
   disabled?: boolean;
-};
-
-const colorMap = {
-  primary: 'primary',
-  success: 'success',
-  error: 'error',
+  loading?: boolean;
 };
 
 const PreappointmentButton = ({
@@ -19,12 +14,13 @@ const PreappointmentButton = ({
   label,
   color = 'primary',
   disabled = false,
-}: PreappointmentButtonProps): ReactElement => {
+  loading = false,
+}: PreappointmentButtonProps): React.ReactElement => {
   return (
     <Button
       variant="contained"
-      color={colorMap[color]}
-      disabled={disabled}
+      color={color}
+      disabled={disabled || loading}
       sx={{
         textTransform: 'none',
         marginLeft: '8px',
@@ -37,7 +33,7 @@ const PreappointmentButton = ({
       onClick={onClick}
       type="button"
     >
-      {label}
+      {loading ? <CircularProgress size={20} color="inherit" /> : label}
     </Button>
   );
 };

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, MouseEvent, ReactElement, TouchEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import usePreviewPublisherContext from '../../hooks/usePreviewPublisherContext';
 import ControlPanel from '../../components/WaitingRoom/ControlPanel';
 import VideoContainer from '../../components/WaitingRoom/VideoContainer';
@@ -34,6 +33,7 @@ const WaitingRoom = (): ReactElement => {
   const [openAudioOutput, setOpenAudioOutput] = useState<boolean>(false);
   const [username, setUsername] = useState(getStorageItem(STORAGE_KEYS.USERNAME) ?? '');
   const [preappointmentStarted, setPreappointmentStarted] = useState(false);
+  const [preappointmentLoading, setPreappointmentLoading] = useState(false);
   const [preappointmentStreamId, setPreappointmentStreamId] = useState<string | null>(null);
   const isSmallViewport = useIsSmallViewport();
 
@@ -71,8 +71,9 @@ const WaitingRoom = (): ReactElement => {
 
   // Combined handler: on Start, do /vregister then /vstart; on Stop, do /vstop
   const handlePreappointmentToggle = async () => {
-    try {
-      if (!preappointmentStarted) {
+    setPreappointmentLoading(true);
+    if (!preappointmentStarted) {
+      try {
         // --- Start: Register, connect, publish, then start ---
         // 1. Register
         const regResponse = await fetch(getPreappointmentApiUrl('/vregister'), { method: 'POST' });
@@ -86,11 +87,6 @@ const WaitingRoom = (): ReactElement => {
         preappointmentSession.current = {
           sessionId: regData.session.sessionId,
           token: regData.session.token,
-          token2: regData.session.token2,
-          created: regData.session.created,
-          id: regData.session.id,
-          lang: regData.session.lang,
-          streams: regData.session.streams,
           apiKey: regData.session.apiKey,
         };
         console.log('Preappointment Check-in response:', regData);
@@ -145,7 +141,7 @@ const WaitingRoom = (): ReactElement => {
                     } else {
                       console.log('Publisher published to session');
                       // Now that we're published, we can get the streamId from publisher
-                      streamId = publisher.stream?.streamId || publisher.stream?.id;
+                      streamId = publisher.stream?.streamId ?? null;
                       setPreappointmentStreamId(streamId);
                       resolve();
                     }
@@ -160,7 +156,7 @@ const WaitingRoom = (): ReactElement => {
         }
 
         // 3. Start
-        const sessionId = preappointmentSession.current.sessionId;
+        const sessionId = preappointmentSession.current?.sessionId;
         const sid = streamId || preappointmentStreamId;
         const language = 'en-US';
         const promptId = 24; // 24 is Health Intake prompt. 21 is Pizza Ordering
@@ -168,6 +164,7 @@ const WaitingRoom = (): ReactElement => {
         const voice = 'us';
         if (!sid) {
           console.warn('No streamId available. Wait for streamCreated event.');
+          setPreappointmentLoading(false);
           return;
         }
         console.log('Sending vstart payload:', {
@@ -197,9 +194,15 @@ const WaitingRoom = (): ReactElement => {
           console.log('Preappointment Start response:', data);
           setPreappointmentStarted(true);
         }
-      } else {
-        // --- Stop ---
-        const sessionId = preappointmentSession.current.sessionId;
+        setPreappointmentLoading(false);
+      } catch (err) {
+        console.error('Preappointment Toggle error:', err);
+        setPreappointmentLoading(false);
+      }
+    } else {
+      // --- Stop ---
+      try {
+        const sessionId = preappointmentSession.current?.sessionId;
         const response = await fetch(getPreappointmentApiUrl('/vstop'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -212,7 +215,7 @@ const WaitingRoom = (): ReactElement => {
         } else {
           try {
             data = JSON.parse(text);
-          } catch (_jsonErr) {
+          } catch {
             console.error('vstop: Failed to parse JSON. Raw response:', text);
             data = text;
           }
@@ -223,9 +226,11 @@ const WaitingRoom = (): ReactElement => {
           console.log('Preappointment Stop response:', data);
           setPreappointmentStarted(false);
         }
+        setPreappointmentLoading(false);
+      } catch (err) {
+        console.error('Preappointment Toggle error:', err);
+        setPreappointmentLoading(false);
       }
-    } catch (err) {
-      console.error('Preappointment Toggle error:', err);
     }
   };
 
@@ -308,6 +313,7 @@ const WaitingRoom = (): ReactElement => {
                   color={preappointmentStarted ? 'error' : 'success'}
                   // Only disable if publisher is not ready (for Start)
                   disabled={!publisher && !preappointmentStarted}
+                  loading={preappointmentLoading}
                 />
               }
             />
