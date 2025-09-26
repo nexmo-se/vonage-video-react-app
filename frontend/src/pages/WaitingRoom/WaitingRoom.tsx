@@ -43,6 +43,21 @@ const WaitingRoom = (): ReactElement => {
     apiKey?: string;
   } | null>(null);
 
+  // On mount: if ?name= is present, override username and localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlName = params.get('name');
+    if (urlName && urlName.trim() !== '' && urlName !== username) {
+      setUsername(urlName);
+      try {
+        localStorage.setItem(STORAGE_KEYS.USERNAME, urlName);
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Pass publisher's connectionId and sessionId to /vregister
 
   // Helper to get the full Preappointment API URL for a route, using env if set, else local
