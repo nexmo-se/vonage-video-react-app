@@ -1,3 +1,4 @@
+import DialogBox, { Message } from '../../components/DialogBox';
 import { useState, useEffect, useRef, MouseEvent, ReactElement, TouchEvent } from 'react';
 import usePreviewPublisherContext from '../../hooks/usePreviewPublisherContext';
 import ControlPanel from '../../components/WaitingRoom/ControlPanel';
@@ -25,6 +26,13 @@ import PreappointmentButton from '../../components/PreappointmentButton';
  * @returns {ReactElement} - The waiting room.
  */
 const WaitingRoom = (): ReactElement => {
+  // Example messages for demonstration
+  const demoMessages: Message[] = [
+    { sender: 'You', text: 'Hello, how can I help you today?' },
+    { sender: 'AI Bot', text: 'I am here to assist you with your health intake.' },
+    { sender: 'You', text: 'Great, let’s get started.' },
+    { sender: 'AI Bot', text: 'Please tell me about your symptoms.' },
+  ];
   const { initLocalPublisher, publisher, accessStatus, destroyPublisher } =
     usePreviewPublisherContext();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -303,20 +311,39 @@ const WaitingRoom = (): ReactElement => {
                 />
               )}
             </div>
-            <UsernameInput
-              username={username}
-              setUsername={setUsername}
-              preappointmentButtons={
-                <PreappointmentButton
-                  onClick={handlePreappointmentToggle}
-                  label={preappointmentStarted ? 'Preappointment Stop' : 'Preappointment Start'}
-                  color={preappointmentStarted ? 'error' : 'success'}
-                  // Only disable if publisher is not ready (for Start)
-                  disabled={!publisher && !preappointmentStarted}
-                  loading={preappointmentLoading}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isSmallViewport ? 'column' : 'row',
+                alignItems: 'center',
+                maxWidth: 700,
+                gap: 32,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 280 }}>
+                <UsernameInput
+                  username={username}
+                  setUsername={setUsername}
+                  preappointmentButtons={
+                    <PreappointmentButton
+                      onClick={handlePreappointmentToggle}
+                      label={preappointmentStarted ? 'Preappointment Stop' : 'Preappointment Start'}
+                      color={preappointmentStarted ? 'error' : 'success'}
+                      // Only disable if publisher is not ready (for Start)
+                      disabled={!publisher && !preappointmentStarted}
+                      loading={preappointmentLoading}
+                    />
+                  }
                 />
-              }
-            />
+              </div>
+              <div style={{ maxWidth: 400, width: '100%' }}>
+                <DialogBox
+                  messages={demoMessages}
+                  localUser="You"
+                  style={{ maxHeight: 500, height: 350 }}
+                />
+              </div>
+            </div>
           </div>
         </div>
         {accessStatus !== DEVICE_ACCESS_STATUS.ACCEPTED && (
