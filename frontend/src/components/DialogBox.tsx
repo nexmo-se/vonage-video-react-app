@@ -12,6 +12,15 @@ export type DialogBoxProps = {
 };
 
 const DialogBox: React.FC<DialogBoxProps> = ({ messages, localUser }) => {
+  // 🔍 DEBUG: Log when DialogBox receives new messages
+  React.useEffect(() => {
+    console.log('📋 [DIALOGBOX] Received messages update:', {
+      messageCount: messages.length,
+      messages: messages.map((m) => ({ sender: m.sender, textPreview: m.text.slice(0, 50) })),
+      localUser,
+    });
+  }, [messages, localUser]);
+
   return (
     <div
       style={{
