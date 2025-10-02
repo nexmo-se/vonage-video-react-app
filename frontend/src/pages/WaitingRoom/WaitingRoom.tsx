@@ -11,49 +11,9 @@ import { getStorageItem, STORAGE_KEYS } from '../../utils/storage';
 import useIsSmallViewport from '../../hooks/useIsSmallViewport';
 import PreappointmentButton from '../../components/PreappointmentButton';
 
-// Complete type definitions for browser SpeechRecognition APIs
-type SpeechRecognitionConstructor = new () => SpeechRecognition;
-
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  onstart: ((event: Event) => void) | null;
-  onend: ((event: Event) => void) | null;
-  onerror: ((event: Event) => void) | null;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-}
-
-// TypeScript: Add SpeechRecognition types for browser compatibility
+// TypeScript: Add OpenTok types for browser compatibility
 declare global {
   interface Window {
-    SpeechRecognition: SpeechRecognitionConstructor | undefined;
-    webkitSpeechRecognition: SpeechRecognitionConstructor | undefined;
     OT?: unknown;
   }
 }
@@ -75,42 +35,7 @@ declare global {
 const WaitingRoom = (): ReactElement => {
   // Live dialog messages state
   const [messages, setMessages] = useState<Message[]>([]);
-  // Reference to current messages for STT filtering (avoids effect restart on message changes)
-  const messagesRef = useRef<Message[]>([]);
-  // Track last user STT message for AI-vs-user caption disambiguation
-  const lastUserSTTRef = useRef<string | null>(null);
 
-  // Track when AI is speaking to avoid STT picking up AI audio
-  const [aiCurrentlySpeaking, setAiCurrentlySpeaking] = useState(false);
-  const aiCurrentlySpeakingRef = useRef(false);
-  const aiSpeakingTimeoutRef = useRef<number | null>(null);
-
-  // Track recent AI messages for exact content filtering
-  const [recentAIMessages, setRecentAIMessages] = useState<string[]>([]);
-  const recentAIMessagesRef = useRef<string[]>([]);
-  // Track when local user is actually speaking (via publisher audio levels)
-  const [userCurrentlySpeaking, setUserCurrentlySpeaking] = useState(false);
-  const userCurrentlySpeakingRef = useRef(false);
-  const userSpeakingTimeoutRef = useRef<number | null>(null);
-
-  // Update refs when states change to avoid STT effect restarts
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    aiCurrentlySpeakingRef.current = aiCurrentlySpeaking;
-  }, [aiCurrentlySpeaking]);
-
-  useEffect(() => {
-    userCurrentlySpeakingRef.current = userCurrentlySpeaking;
-  }, [userCurrentlySpeaking]);
-
-  useEffect(() => {
-    recentAIMessagesRef.current = recentAIMessages;
-  }, [recentAIMessages]);
-
-  const sttRecognitionRef = useRef<SpeechRecognition | null>(null);
   // Store OpenTok session instance
   const [session, setSession] = useState<any>(null);
   const { initLocalPublisher, publisher, accessStatus, destroyPublisher } =
@@ -215,54 +140,6 @@ const WaitingRoom = (): ReactElement => {
                     console.error('Error subscribing to AI stream:', err);
                   } else {
                     console.log('Subscribed to AI agent stream:', sid);
-
-                    // Listen for audio level events to detect AI speaking with enhanced buffering
-                    let lastAudioTime = 0;
-                    let consecutiveAIAudio = 0;
-
-                    subscriber.on('audioLevelUpdated', (aiEvent: any) => {
-                      const { audioLevel } = aiEvent;
-                      const now = Date.now();
-
-                      // Enhanced AI audio detection with sustained audio check
-                      if (audioLevel > 0.15) {
-                        consecutiveAIAudio += 1;
-
-                        // Only log every 500ms to reduce noise
-                        if (now - lastAudioTime > 500) {
-                          console.log(
-                            '[🔊 AI Audio] Level:',
-                            audioLevel.toFixed(3),
-                            'Consecutive:',
-                            consecutiveAIAudio
-                          );
-                          lastAudioTime = now;
-                        }
-
-                        // Set AI speaking state immediately for any significant audio
-                        setAiCurrentlySpeaking(true);
-                        console.log(
-                          '🟢 [AI STATE] Set aiCurrentlySpeaking = TRUE (audio detected)'
-                        );
-
-                        // Clear any existing timeout
-                        if (aiSpeakingTimeoutRef.current) {
-                          window.clearTimeout(aiSpeakingTimeoutRef.current);
-                        }
-
-                        // Enhanced buffer: longer timeout to ensure AI has finished speaking
-                        aiSpeakingTimeoutRef.current = window.setTimeout(() => {
-                          console.log(
-                            '🔴 [AI STATE] Set aiCurrentlySpeaking = FALSE (silence buffer expired)'
-                          );
-                          setAiCurrentlySpeaking(false);
-                          consecutiveAIAudio = 0; // Reset counter
-                        }, 3000); // 3 seconds buffer to catch AI pauses and ensure complete silence
-                      } else if (audioLevel < 0.05) {
-                        // Reset counter for low audio levels
-                        consecutiveAIAudio = Math.max(0, consecutiveAIAudio - 1);
-                      }
-                    });
                   }
                 }
               );
@@ -388,78 +265,6 @@ const WaitingRoom = (): ReactElement => {
     };
   }, [initLocalPublisher, publisher, destroyPublisher]);
 
-  // Set up publisher audio level detection for local user speech
-  useEffect(() => {
-    if (!publisher || !preappointmentStarted) {
-      return;
-    }
-
-    console.log('[Publisher Audio] Setting up local user speech detection');
-
-    let lastUserAudioTime = 0;
-    let consecutiveHighAudio = 0;
-    const userAudioHandler = (event: any) => {
-      const audioLevel = event.audioLevel;
-      const now = Date.now();
-
-      // Higher threshold and sustained audio detection to filter out background noise
-      if (audioLevel > 0.2) {
-        // Higher threshold for meaningful speech
-        consecutiveHighAudio++;
-
-        // Only consider it "speaking" if we have sustained high audio levels
-        if (consecutiveHighAudio >= 3) {
-          // Need 3 consecutive high readings
-          // Log only every 500ms to reduce noise
-          if (now - lastUserAudioTime > 500) {
-            // console.log(
-            //   '[User Audio] Speech detected:',
-            //   audioLevel.toFixed(3),
-            //   'consecutive:',
-            //   consecutiveHighAudio
-            // );
-            lastUserAudioTime = now;
-          }
-
-          // Set user speaking state for sustained audio
-          setUserCurrentlySpeaking(true);
-
-          // Clear any existing timeout
-          if (userSpeakingTimeoutRef.current) {
-            window.clearTimeout(userSpeakingTimeoutRef.current);
-          }
-
-          // Set timeout to clear user speaking state after silence
-          userSpeakingTimeoutRef.current = window.setTimeout(() => {
-            // console.log('[User Audio] Speech ended');
-            setUserCurrentlySpeaking(false);
-            consecutiveHighAudio = 0; // Reset counter
-          }, 2000); // 2 seconds of silence before marking user as stopped
-        }
-      } else {
-        // Reset consecutive counter for low audio levels
-        if (audioLevel < 0.05) {
-          consecutiveHighAudio = 0;
-        }
-      }
-    };
-
-    // Add audio level listener to publisher (local user)
-    publisher.on('audioLevelUpdated', userAudioHandler);
-
-    return () => {
-      if (publisher) {
-        publisher.off('audioLevelUpdated', userAudioHandler);
-        console.log('[Publisher Audio] Removed local user speech detection');
-      }
-      // Clear user speaking timeout on cleanup
-      if (userSpeakingTimeoutRef.current) {
-        window.clearTimeout(userSpeakingTimeoutRef.current);
-        userSpeakingTimeoutRef.current = null;
-      }
-    };
-  }, [publisher, preappointmentStarted]);
-
   // Set up OpenTok session instance after /vregister
   useEffect(() => {
     if (
@@ -478,163 +283,13 @@ const WaitingRoom = (): ReactElement => {
     }
   }, [preappointmentSession.current?.sessionId, preappointmentSession.current?.apiKey]);
 
-  // Local user STT: Web Speech API for capturing user's local speech
-  useEffect(() => {
-    console.log(
-      '[STT effect] Running STT effect. session:',
-      session,
-      'preappointmentStarted:',
-      preappointmentStarted
-    );
-
-    // Only start STT if preappointment has been successfully started
-    if (!preappointmentStarted) {
-      console.log('[STT effect] Preappointment not started yet, skipping STT setup');
-      return;
-    }
-
-    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    console.log('[STT effect] SpeechRecognitionCtor:', SpeechRecognitionCtor);
-    if (!SpeechRecognitionCtor) {
-      console.warn('Web Speech API not supported in this browser.');
-      return;
-    }
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onstart = (event: Event) => {
-      console.log('[STT] Speech recognition started:', event);
-    };
-
-    recognition.onerror = (event: Event) => {
-      console.error('[STT] Speech recognition error:', event);
-    };
-
-    recognition.onend = (event: Event) => {
-      console.log('[STT] Speech recognition ended:', event);
-    };
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      console.log('[STT] Speech result event received');
-
-      // IMMEDIATE GATE: Block all STT processing if AI is currently speaking
-      if (aiCurrentlySpeakingRef.current) {
-        console.log('🚫 [PRIMARY AI GATE] AI is speaking - ignoring all STT results');
-        return;
-      }
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          const alternative = result[0];
-          const text = alternative.transcript.trim();
-          const confidence = alternative.confidence;
-
-          console.log('[STT] Final transcript:', text);
-          console.log('[STT] Confidence:', confidence);
-
-          // Process user speech with minimal filtering (AI gate already handled above)
-          if (text.length > 0) {
-            console.log(
-              '🎤 [STT] Processing transcript:',
-              text,
-              'Confidence:',
-              confidence.toFixed(3)
-            );
-            console.log(
-              '🔍 [STT Context] AI speaking:',
-              aiCurrentlySpeakingRef.current,
-              'User speaking:',
-              userCurrentlySpeakingRef.current
-            );
-
-            // SECONDARY FILTER: Basic quality check for very poor STT results
-            if (confidence < 0.5 && !userCurrentlySpeakingRef.current) {
-              console.log(
-                '🚫 [QUALITY FILTER] Very low confidence + no user audio - blocking:',
-                text
-              );
-              return;
-            }
-
-            // TERTIARY FILTER: Fallback content check against recent AI messages
-            const recentAIContent = recentAIMessagesRef.current;
-            if (recentAIContent.length > 0) {
-              const normalizedTranscript = text.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-
-              const isLikelyAIEcho = recentAIContent.some((aiMessage) => {
-                const normalizedAI = aiMessage.toLowerCase().replace(/[^a-z0-9\s]/g, '');
-
-                // Simple substring check for obvious AI echoes that slipped through
-                const isSubstring =
-                  normalizedAI.includes(normalizedTranscript) ||
-                  normalizedTranscript.includes(normalizedAI);
-
-                if (isSubstring) {
-                  console.log('📊 [Fallback Content Check] Found AI echo:', {
-                    transcript: normalizedTranscript,
-                    aiMessage: normalizedAI,
-                  });
-                }
-
-                return isSubstring;
-              });
-
-              if (isLikelyAIEcho) {
-                console.log(
-                  '🚫 [FALLBACK AI ECHO] Blocking AI content that slipped through:',
-                  text
-                );
-                return;
-              }
-            }
-
-            // ACCEPT: Add as legitimate user speech
-            const displayName = username || 'You';
-            setMessages((prev) => [
-              ...prev,
-              {
-                sender: displayName,
-                text,
-              },
-            ]);
-
-            lastUserSTTRef.current = text;
-            console.log('✅ [USER ACCEPTED] Added user speech:', displayName, '-', text);
-          }
-        }
-      }
-    };
-
-    sttRecognitionRef.current = recognition;
-    console.log('[STT effect] Starting speech recognition - preappointment is active');
-    recognition.start();
-
-    return () => {
-      console.log('[STT effect] Cleaning up speech recognition');
-      recognition.stop();
-      // Clear timeouts on cleanup
-      if (aiSpeakingTimeoutRef.current) {
-        window.clearTimeout(aiSpeakingTimeoutRef.current);
-        aiSpeakingTimeoutRef.current = null;
-      }
-      if (userSpeakingTimeoutRef.current) {
-        window.clearTimeout(userSpeakingTimeoutRef.current);
-        userSpeakingTimeoutRef.current = null;
-      }
-    };
-  }, [session, username, preappointmentStarted]);
-
   // Signal API: receive AI Health Intake Agent messages
   useEffect(() => {
     if (!session) {
       return;
     }
 
-    // Enhanced handler for AI Health Intake Agent messages via signal:chat
+    // Handler for both USER and ASSISTANT messages via signal:chat
     const chatHandler = (event: { data: unknown }) => {
       console.log('🔔 [Signal API] Raw signal event received:', {
         eventType: event.constructor.name,
@@ -662,20 +317,20 @@ const WaitingRoom = (): ReactElement => {
 
         const signalData = data as { role?: string; content?: string; [key: string]: unknown };
 
-        // Process AI Health Intake Agent messages
+        // Process both USER and ASSISTANT messages from Signal API
         if (signalData.role === 'ASSISTANT') {
           if (!signalData.content) {
-            console.warn('[AI Agent] ASSISTANT signal missing content:', signalData);
+            console.warn('[Signal API] ASSISTANT signal missing content:', signalData);
             return;
           }
 
           const content = signalData.content.trim();
           if (content.length === 0) {
-            console.warn('[AI Agent] ASSISTANT signal has empty content');
+            console.warn('[Signal API] ASSISTANT signal has empty content');
             return;
           }
 
-          console.log('💬 [AI Agent] Processing ASSISTANT message from Signal API:', content);
+          console.log('🤖 [Signal API] Processing ASSISTANT message:', content);
 
           // Add AI Health Intake Agent message to dialog
           setMessages((prev) => [
@@ -685,28 +340,51 @@ const WaitingRoom = (): ReactElement => {
               text: content,
             },
           ]);
-
-          // Track recent AI messages for STT filtering (keep last 3 messages)
-          setRecentAIMessages((prev) => {
-            const updated = [...prev, content].slice(-3);
-            console.log('🧠 [AI MESSAGE TRACKER] Updated recent AI messages for STT filtering:', {
-              newMessage: content,
-              allRecent: updated,
-              count: updated.length,
-            });
-            return updated;
-          });
-
-          // Reset AI speaking flag after processing a complete message with delay
-          setTimeout(() => {
-            console.log('[AI Signal] Clearing AI speaking flag after message');
-            setAiCurrentlySpeaking(false);
-          }, 3000); // 3 seconds after receiving complete AI message
         } else if (signalData.role === 'USER') {
-          // System-generated USER signals should be ignored (we handle user via STT)
-          console.log('[AI Agent] Ignoring system USER signal:', signalData.content);
+          if (!signalData.content) {
+            console.warn('[Signal API] USER signal missing content:', signalData);
+            return;
+          }
+
+          const content = signalData.content.trim();
+          if (content.length === 0) {
+            console.warn('[Signal API] USER signal has empty content');
+            return;
+          }
+
+          // Filter out common test/initialization messages that aren't real user speech
+          const lowerContent = content.toLowerCase();
+          const testPhrases = [
+            'hello there',
+            'hi there',
+            'test',
+            'hello',
+            'testing',
+            'can you hear me',
+          ];
+
+          const isTestMessage = testPhrases.some(
+            (phrase) => lowerContent === phrase || lowerContent.includes(phrase)
+          );
+
+          if (isTestMessage) {
+            console.log('🚫 [FILTER] Ignoring test/initialization USER message:', content);
+            return;
+          }
+
+          console.log('👤 [Signal API] Processing USER message:', content);
+
+          // Add user message to dialog
+          const displayName = username || 'You';
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: displayName,
+              text: content,
+            },
+          ]);
         } else {
-          console.log('[AI Agent] Unknown signal role:', signalData.role, signalData);
+          console.log('[Signal API] Unknown signal role:', signalData.role, signalData);
         }
       } catch (error) {
         console.error('[AI Agent] Signal processing error:', error, 'Raw data:', event.data);
