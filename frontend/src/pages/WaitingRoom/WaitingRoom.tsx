@@ -127,19 +127,22 @@ const WaitingRoom = (): ReactElement => {
 
             // Subscribe to remote streams (not your own) - this is the AI agent's audio
             if (event.stream.connection.connectionId !== session.connection.connectionId) {
+              const aiVideoContainer = document.getElementById('ai-video-container');
               const subscriber = session.subscribe(
                 event.stream,
-                undefined,
+                aiVideoContainer,
                 {
                   insertMode: 'append',
-                  width: '100%',
-                  height: '100%',
+                  width: '1px',
+                  height: '1px',
+                  publishAudio: true,
+                  publishVideo: false,
                 },
                 (err: any) => {
                   if (err) {
                     console.error('Error subscribing to AI stream:', err);
                   } else {
-                    console.log('Subscribed to AI agent stream:', sid);
+                    console.log('Subscribed to AI agent stream (hidden):', sid);
                   }
                 }
               );
@@ -450,6 +453,19 @@ const WaitingRoom = (): ReactElement => {
 
   return (
     <div className="flex size-full flex-col bg-white" data-testid="waitingRoom">
+      {/* Hidden container for AI video to prevent it from overlapping UI elements */}
+      <div
+        id="ai-video-container"
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+          zIndex: -1000,
+        }}
+      />
       <Banner />
       <div className="flex w-full">
         <div className="flex w-full justify-center">
@@ -497,7 +513,7 @@ const WaitingRoom = (): ReactElement => {
                 />
               </div>
               <div style={{ maxWidth: 400, width: '100%' }}>
-                <DialogBox messages={messages} localUser={username || 'You'} />
+                <DialogBox messages={[...messages].reverse()} localUser={username || 'You'} />
               </div>
             </div>
           </div>
