@@ -11,8 +11,22 @@ import BannerLogo from '../BannerLogo';
  */
 const Banner = (): ReactElement => {
   return (
-    <div className="flex w-full flex-row justify-between">
+    <div className="flex w-full flex-row justify-between items-center">
       <BannerLogo />
+
+      {/* AI Video Container - positioned between logo and time */}
+      <div
+        id="ai-video-container"
+        className="flex-1 mx-4"
+        style={{
+          height: '72px',
+          backgroundColor: 'transparent',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          minWidth: '128px',
+          maxWidth: '200px',
+        }}
+      />
 
       <div className="flex px-4">
         <BannerDateTime />

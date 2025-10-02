@@ -125,24 +125,25 @@ const WaitingRoom = (): ReactElement => {
             console.log('streamCreated: got streamId for vstart:', sid);
             setPreappointmentStreamId(sid);
 
-            // Subscribe to remote streams (not your own) - this is the AI agent's audio
+            // Subscribe to remote streams (not your own) - this is the AI agent's video
             if (event.stream.connection.connectionId !== session.connection.connectionId) {
               const aiVideoContainer = document.getElementById('ai-video-container');
               const subscriber = session.subscribe(
                 event.stream,
                 aiVideoContainer,
                 {
-                  insertMode: 'append',
-                  width: '1px',
-                  height: '1px',
+                  insertMode: 'replace',
+                  width: '2000px',
+                  height: '50px',
                   publishAudio: true,
-                  publishVideo: false,
+                  publishVideo: true,
+                  fitMode: 'cover',
                 },
                 (err: any) => {
                   if (err) {
                     console.error('Error subscribing to AI stream:', err);
                   } else {
-                    console.log('Subscribed to AI agent stream (hidden):', sid);
+                    console.log('Subscribed to AI agent stream (visible):', sid);
                   }
                 }
               );
@@ -453,19 +454,6 @@ const WaitingRoom = (): ReactElement => {
 
   return (
     <div className="flex size-full flex-col bg-white" data-testid="waitingRoom">
-      {/* Hidden container for AI video to prevent it from overlapping UI elements */}
-      <div
-        id="ai-video-container"
-        style={{
-          position: 'fixed',
-          top: '-9999px',
-          left: '-9999px',
-          width: '1px',
-          height: '1px',
-          overflow: 'hidden',
-          zIndex: -1000,
-        }}
-      />
       <Banner />
       <div className="flex w-full">
         <div className="flex w-full justify-center">
