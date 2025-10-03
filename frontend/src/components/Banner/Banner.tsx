@@ -19,7 +19,7 @@ const Banner = (): ReactElement => {
         id="ai-video-container"
         className="flex-1 mx-4"
         style={{
-          height: '72px',
+          height: '144px',
           backgroundColor: 'transparent',
           borderRadius: '8px',
           overflow: 'hidden',

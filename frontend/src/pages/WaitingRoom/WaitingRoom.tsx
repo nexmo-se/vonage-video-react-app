@@ -1,4 +1,12 @@
-import { useState, useEffect, useRef, MouseEvent, ReactElement, TouchEvent } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  MouseEvent,
+  ReactElement,
+  TouchEvent,
+  useCallback,
+} from 'react';
 import DialogBox, { Message } from '../../components/DialogBox';
 import usePreviewPublisherContext from '../../hooks/usePreviewPublisherContext';
 import ControlPanel from '../../components/WaitingRoom/ControlPanel';
@@ -7,9 +15,14 @@ import UsernameInput from '../../components/WaitingRoom/UserNameInput';
 import { DEVICE_ACCESS_STATUS } from '../../utils/constants';
 import DeviceAccessAlert from '../../components/DeviceAccessAlert';
 import Banner from '../../components/Banner';
-import { getStorageItem, STORAGE_KEYS } from '../../utils/storage';
+import { getStorageItem, STORAGE_KEYS, setStorageItem } from '../../utils/storage';
 import useIsSmallViewport from '../../hooks/useIsSmallViewport';
 import PreappointmentButton from '../../components/PreappointmentButton';
+import { useNavigate } from 'react-router-dom';
+import useRoomName from '../../hooks/useRoomName';
+import isValidRoomName from '../../utils/isValidRoomName';
+import useUserContext from '../../hooks/useUserContext';
+import { UserType } from '../../Context/user';
 
 // TypeScript: Add OpenTok types for browser compatibility
 declare global {
@@ -50,6 +63,11 @@ const WaitingRoom = (): ReactElement => {
   const [preappointmentStreamId, setPreappointmentStreamId] = useState<string | null>(null);
   const isSmallViewport = useIsSmallViewport();
 
+  // Add hooks for join functionality
+  const navigate = useNavigate();
+  const roomName = useRoomName();
+  const { setUser } = useUserContext();
+
   const preappointmentSession = useRef<{
     sessionId?: string;
     token?: string;
@@ -72,16 +90,90 @@ const WaitingRoom = (): ReactElement => {
   }, []);
 
   // Helper to get the full Preappointment API URL for a route, using env if set, else local
-  const getPreappointmentApiUrl = (route: string) => {
+  const getPreappointmentApiUrl = useCallback((route: string) => {
     const base = import.meta.env.VITE_PREAPPOINTMENT_API_URL;
     if (base && base.trim() !== '') {
       return base.replace(/\/$/, '') + route;
     }
     return route;
-  };
+  }, []);
+
+  // Function to handle automatic join: stop assistant and join meeting
+  const handleAutomaticJoin = useCallback(async () => {
+    console.log('[Auto Join] Received join signal - stopping assistant and joining meeting...');
+
+    try {
+      // 1. Stop the assistant (same as clicking "Participant Stop")
+      if (preappointmentStarted) {
+        setPreappointmentLoading(true);
+        const sessionId = preappointmentSession.current?.sessionId;
+        const response = await fetch(getPreappointmentApiUrl('/vstop'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        });
+        const text = await response.text();
+        let data;
+        if (text.trim() === '') {
+          data = null;
+        } else {
+          try {
+            data = JSON.parse(text);
+          } catch {
+            console.error('vstop: Failed to parse JSON. Raw response:', text);
+            data = text;
+          }
+        }
+        if (!response.ok) {
+          console.error('vstop: Server returned error', response.status, data);
+        } else {
+          console.log('Auto Join - Assistant stopped:', data);
+          setPreappointmentStarted(false);
+        }
+        setPreappointmentLoading(false);
+      }
+
+      // 2. Join the meeting (same as clicking "Join" button)
+      if (username && roomName && isValidRoomName(roomName)) {
+        setUser((prevUser: UserType) => ({
+          ...prevUser,
+          defaultSettings: {
+            ...prevUser.defaultSettings,
+            name: username,
+          },
+        }));
+        setStorageItem(STORAGE_KEYS.USERNAME, username);
+        console.log('[Auto Join] Navigating to meeting room:', roomName);
+        navigate(`/room/${roomName}`, {
+          state: {
+            hasAccess: true,
+          },
+        });
+      } else {
+        console.warn('[Auto Join] Cannot join - missing username or invalid room name:', {
+          username,
+          roomName,
+          isValid: roomName ? isValidRoomName(roomName) : false,
+        });
+      }
+    } catch (error) {
+      console.error('[Auto Join] Error during automatic join process:', error);
+      setPreappointmentLoading(false);
+    }
+  }, [
+    preappointmentStarted,
+    preappointmentSession,
+    getPreappointmentApiUrl,
+    setPreappointmentLoading,
+    setPreappointmentStarted,
+    username,
+    roomName,
+    setUser,
+    navigate,
+  ]);
 
   // Combined handler: on Start, do /vregister then /vstart; on Stop, do /vstop
-  const handlePreappointmentToggle = async () => {
+  const handlePreappointmentToggle = useCallback(async () => {
     console.log(
       '[Preappointment] handlePreappointmentToggle called. preappointmentStarted:',
       preappointmentStarted
@@ -256,7 +348,15 @@ const WaitingRoom = (): ReactElement => {
         setPreappointmentLoading(false);
       }
     }
-  };
+  }, [
+    preappointmentStarted,
+    setPreappointmentLoading,
+    getPreappointmentApiUrl,
+    preappointmentSession,
+    setPreappointmentStarted,
+    publisher,
+    setPreappointmentStreamId,
+  ]);
 
   useEffect(() => {
     if (!publisher) {
@@ -336,6 +436,28 @@ const WaitingRoom = (): ReactElement => {
 
           console.log('🤖 [Signal API] Processing ASSISTANT message:', content);
 
+          // Check for end-of-conversation phrases that indicate user should join the meeting
+          const lowerContent = content.toLowerCase();
+          const endPhrases = [
+            'you may now enter the video conference',
+            'you can now join the meeting',
+            'please join the video conference',
+            'ready to join the meeting',
+            'proceed to the video conference',
+          ];
+
+          const isEndOfConversation = endPhrases.some((phrase) => lowerContent.includes(phrase));
+
+          if (isEndOfConversation && preappointmentStarted) {
+            console.log(
+              '🏁 [Auto Complete] Detected end-of-conversation message - auto-stopping and joining meeting'
+            );
+            // Automatically stop the preappointment and join meeting after a brief delay
+            setTimeout(() => {
+              handleAutomaticJoin();
+            }, 1000);
+          }
+
           // Add AI Health Intake Agent message to dialog
           setMessages((prev) => [
             ...prev,
@@ -395,6 +517,29 @@ const WaitingRoom = (): ReactElement => {
       }
     };
 
+    // Handler for join signal - automatically stop assistant and join meeting
+    const joinHandler = (event: { data: unknown }) => {
+      console.log('🚀 [Join Signal] Received join signal:', event.data);
+
+      try {
+        // Parse signal data
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+        // Check if this is a join signal
+        if (data && typeof data === 'object' && data.type === 'join') {
+          console.log('🚀 [Join Signal] Processing join signal - triggering automatic join');
+          handleAutomaticJoin();
+        }
+      } catch (error) {
+        console.error(
+          '[Join Signal] Error processing join signal:',
+          error,
+          'Raw data:',
+          event.data
+        );
+      }
+    };
+
     // Enhanced debugging: Listen for ALL signal types to see what's being sent
     const debugSignalHandler = (event: any) => {
       console.log('🔍 [DEBUG] Received any signal:', {
@@ -407,15 +552,17 @@ const WaitingRoom = (): ReactElement => {
     // Register handlers for AI Health Intake Agent signals
     session.on('signal', debugSignalHandler); // Catch all signals for debugging
     session.on('signal:chat', chatHandler); // Main chat handler
+    session.on('signal:join', joinHandler); // Join handler for automatic join
 
-    console.log('📱 [Dialog Setup] Registered enhanced signal handlers (debug + chat)');
+    console.log('📱 [Dialog Setup] Registered enhanced signal handlers (debug + chat + join)');
 
     return () => {
       session.off('signal', debugSignalHandler);
       session.off('signal:chat', chatHandler);
-      console.log('📱 [Dialog Cleanup] Removed signal handlers (debug + chat)');
+      session.off('signal:join', joinHandler);
+      console.log('📱 [Dialog Cleanup] Removed signal handlers (debug + chat + join)');
     };
-  }, [session, username]);
+  }, [session, username, handleAutomaticJoin, handlePreappointmentToggle, preappointmentStarted]);
 
   // After changing device permissions, reload the page to reflect the device's permission change.
   useEffect(() => {

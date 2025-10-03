@@ -11,12 +11,12 @@ const BannerLogo = (): ReactElement => (
   <Link to="..">
     <div className="box-border" data-testid="banner-logo">
       <img
-        className="hidden h-[72px] pl-4 pr-8 md:flex"
+        className="hidden h-[144px] pl-4 pr-8 md:flex"
         src="/images/promony.png"
         alt="Promony-desktop-logo"
       />
       <img
-        className="my-4 h-10 px-8 md:hidden"
+        className="my-4 h-[72px] px-8 md:hidden"
         src="/images/promony.png"
         alt="Promony-mobile-logo"
       />
